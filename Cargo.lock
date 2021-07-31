@@ -201,6 +201,7 @@ name = "exercise-domapi"
 version = "0.1.0"
 dependencies = [
  "combine",
+ "crossbeam-channel",
  "cursive",
  "rusty_v8",
 ]

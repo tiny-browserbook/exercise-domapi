@@ -196,3 +196,80 @@ fn to_pretty_string(mut try_catch: v8::TryCatch<v8::HandleScope>) -> String {
     let line_number = message.get_line_number(&mut try_catch).unwrap_or_default();
     format!("{}:{}: {}", filename, line_number, exception_string)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::html;
+
+    use super::*;
+
+    #[test]
+    fn test_execute() {
+        let (cb_sink, cb_recv) = crossbeam_channel::unbounded();
+        let cb_sink = Rc::new(cb_sink);
+        let node = html::parse(r#"<div id="hello" data="test-data"></div><p id="test">test</p>"#);
+
+        let mut runtime = JavaScriptRuntime::new(
+            Rc::new(RefCell::new(node)),
+            Rc::new(BrowserAPI::new(cb_sink)),
+        );
+        {
+            // a simple math
+            let r = runtime.execute("", "1 + 1");
+            assert!(r.is_ok());
+            assert_eq!(r, Ok("2".into()));
+        }
+        {
+            // simple string operation
+            let r = runtime.execute("", "'test' + \"func\" + `012${1+1+1}`");
+            assert!(r.is_ok());
+            assert_eq!(r, Ok("testfunc0123".into()));
+        }
+        {
+            // use of undefined variable
+            let r = runtime.execute("", "test");
+            assert!(r.is_err());
+        }
+        {
+            // lambda definition
+            let r = runtime.execute("", "let inc = (i) => { return i + 1 }; inc(1)");
+            assert!(r.is_ok());
+            assert_eq!(r, Ok("2".into()));
+        }
+        {
+            // variable reuse
+            let r = runtime.execute("", "inc(4)");
+            assert!(r.is_ok());
+            assert_eq!(r, Ok("5".into()));
+        }
+        {
+            // document.getElementById & (element).tagName
+            let r = runtime.execute(
+                "",
+                r#"let tag = document.getElementById("hello"); tag.tagName"#,
+            );
+            assert!(r.is_ok());
+            assert_eq!(r.unwrap(), "div");
+        }
+        {
+            // document.getElementById & attribute access
+            let r = runtime.execute("", r#"tag.data"#);
+            assert!(r.is_ok());
+            assert_eq!(r, Ok("test-data".into()));
+        }
+        {
+            // (element).innerHTML
+            let r = runtime.execute("", r#"tag.innerHTML = `<p id="added">added</p>`"#);
+            assert!(r.is_ok());
+            // check whether rerendering is requested
+            assert!(cb_recv.try_recv().is_ok());
+            assert!(cb_recv.try_recv().is_err());
+            // check the result of changes
+            let r = runtime.execute(
+                "",
+                r#"let added_tag = document.getElementById("added"); added_tag.tagName"#,
+            );
+            assert_eq!(r, Ok("p".into()));
+        }
+    }
+}
