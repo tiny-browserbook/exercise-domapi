@@ -10,6 +10,7 @@ use v8::READ_ONLY;
 
 type NodeRefTarget<'a> = &'a mut Box<Node>;
 
+/// `to_linked_rust_node` returns a `Node` object that corresponds with the given `node_v8`.
 fn to_linked_rust_node<'s>(
     scope: &mut v8::HandleScope<'s>,
     node_v8: v8::Local<v8::Object>,
@@ -20,6 +21,7 @@ fn to_linked_rust_node<'s>(
     unsafe { &mut *node }
 }
 
+/// `to_v8_node` returns the v8 representation of the given `Node` object.
 fn to_v8_node<'s>(
     scope: &mut v8::HandleScope<'s>,
     node_rust: NodeRefTarget,
@@ -40,6 +42,7 @@ fn to_v8_node<'s>(
     node_v8
 }
 
+/// `to_v8_element` returns the v8 representation of the given element.
 fn to_v8_element<'s>(
     scope: &mut v8::HandleScope<'s>,
     tag_name: &str,
@@ -87,7 +90,7 @@ fn to_v8_element<'s>(
                 let node = to_linked_rust_node(scope, this);
                 node.set_inner_html(value.to_rust_string_lossy(scope).as_str());
 
-                JavaScriptRuntime::browser_api(scope).rerender();
+                JavaScriptRuntime::renderer_api(scope).rerender();
             },
         );
     }
@@ -157,7 +160,7 @@ pub fn create_document_object<'s>(
     document
 }
 
-pub fn initialize_domapi<'s>(
+pub fn initialize<'s>(
     scope: &mut v8::ContextScope<'s, v8::EscapableHandleScope>,
     global: v8::Local<v8::Object>,
 ) {

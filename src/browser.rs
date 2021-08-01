@@ -1,7 +1,7 @@
 use crate::{
     css,
     dom::{Node, NodeType},
-    javascript::{binding::BrowserAPI, JavaScriptRuntime},
+    javascript::{binding::RendererAPI, JavaScriptRuntime},
     layout::to_layout_box,
     render::{to_element_container, ElementContainer},
     style::to_styled_node,
@@ -41,13 +41,13 @@ pub fn collect_tag_inners(node: &Box<Node>, tag_name: &str) -> Vec<String> {
         .collect()
 }
 
-pub struct Browser {
+pub struct Renderer {
     view: ElementContainer,
     document_element: Rc<RefCell<Box<Node>>>,
     js_runtime_instance: JavaScriptRuntime,
 }
 
-impl Browser {
+impl Renderer {
     pub fn new(ui_cb_sink: Rc<CbSink>, document_element: Box<Node>) -> Self {
         let stylesheet = css::parse(&format!(
             "{}\n{}",
@@ -67,7 +67,7 @@ impl Browser {
             view,
             js_runtime_instance: JavaScriptRuntime::new(
                 document_element_ref,
-                Rc::new(BrowserAPI::new(ui_cb_sink)),
+                Rc::new(RendererAPI::new(ui_cb_sink)),
             ),
         }
     }
@@ -96,7 +96,7 @@ impl Browser {
     }
 }
 
-impl View for Browser {
+impl View for Renderer {
     fn draw(&self, printer: &cursive::Printer) {
         self.view.draw(printer)
     }

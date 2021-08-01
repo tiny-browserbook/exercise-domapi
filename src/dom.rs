@@ -13,8 +13,6 @@ impl Node {
     pub fn inner_text(&self) -> String {
         self.children
             .iter()
-            .clone()
-            .into_iter()
             .map(|node| match &node.node_type {
                 NodeType::Text(t) => t.data.clone(),
                 _ => node.inner_text(),
@@ -26,16 +24,13 @@ impl Node {
     pub fn inner_html(&self) -> String {
         self.children
             .iter()
-            .clone()
-            .into_iter()
             .map(|node| node.to_string())
             .collect::<Vec<_>>()
             .join("")
     }
 
     pub fn set_inner_html(&mut self, html: &str) {
-        let nodes = html::parse_raw(html.into());
-        self.children = nodes;
+        self.children = html::parse_raw(html.into());
     }
 }
 
@@ -46,8 +41,6 @@ impl ToString for Node {
                 let attrs = e
                     .attributes
                     .iter()
-                    .clone()
-                    .into_iter()
                     .map(|(k, v)| {
                         // TODO (security): do this securely! This might causes mXSS.
                         format!("{}=\"{}\"", k, v)
@@ -57,8 +50,6 @@ impl ToString for Node {
                 let children = self
                     .children
                     .iter()
-                    .clone()
-                    .into_iter()
                     .map(|node| node.inner_html())
                     .collect::<Vec<_>>()
                     .join("");

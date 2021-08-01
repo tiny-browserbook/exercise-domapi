@@ -1,5 +1,5 @@
+use exercise_domapi::{browser::Renderer, html};
 use std::rc::Rc;
-use exercise_domapi::{browser::Browser, html};
 
 const HTML: &str = r#"<body>
     <p>hello</p>
@@ -28,9 +28,9 @@ fn main() {
 
     let node = html::parse(HTML);
 
-    let mut container = Browser::new(Rc::new(siv.cb_sink().clone()), node);
-    container.execute_inline_scripts();
+    let mut renderer = Renderer::new(Rc::new(siv.cb_sink().clone()), node);
+    renderer.execute_inline_scripts();
 
-    siv.add_fullscreen_layer(container);
+    siv.add_fullscreen_layer(renderer);
     siv.run();
 }

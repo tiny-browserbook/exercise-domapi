@@ -6,12 +6,12 @@ use std::{cell::RefCell, rc::Rc, sync::Once};
 
 use crate::dom::Node;
 
-use self::binding::BrowserAPI;
+use self::binding::RendererAPI;
 
 /// `JavaScriptRuntimeState` defines a state of JS runtime that will be stored per v8 isolate.
 pub struct JavaScriptRuntimeState {
     pub context: v8::Global<v8::Context>,
-    pub browser_api: Rc<BrowserAPI>,
+    pub renderer_api: Rc<RendererAPI>,
     pub document_element: Rc<RefCell<Box<Node>>>,
 }
 
@@ -23,7 +23,7 @@ pub struct JavaScriptRuntime {
 }
 
 impl JavaScriptRuntime {
-    pub fn new(document_element: Rc<RefCell<Box<Node>>>, browser_api: Rc<BrowserAPI>) -> Self {
+    pub fn new(document_element: Rc<RefCell<Box<Node>>>, renderer_api: Rc<RendererAPI>) -> Self {
         // init v8 platform just once
         static PUPPY_INIT: Once = Once::new();
         PUPPY_INIT.call_once(move || {
@@ -41,7 +41,7 @@ impl JavaScriptRuntime {
             let context = v8::Context::new(handle_scope);
 
             let global = context.global(handle_scope);
-            domapi::initialize_domapi(&mut v8::ContextScope::new(handle_scope, context), global);
+            domapi::initialize(&mut v8::ContextScope::new(handle_scope, context), global);
 
             let context_scope = handle_scope.escape(context);
             v8::Global::new(handle_scope, context_scope)
@@ -50,7 +50,7 @@ impl JavaScriptRuntime {
         // store state inside v8 isolate
         isolate.set_slot(Rc::new(RefCell::new(JavaScriptRuntimeState {
             context,
-            browser_api,
+            renderer_api,
             document_element,
         })));
 
@@ -132,21 +132,21 @@ impl JavaScriptRuntime {
 }
 
 impl JavaScriptRuntime {
-    /// `browser_api` returns the `BrowserAPI` object in the Rust world linked to the given isolate.
-    pub fn browser_api(isolate: &v8::Isolate) -> Rc<BrowserAPI> {
+    /// `renderer_api` returns the `BrowserAPI` object in the Rust world linked to the given isolate.
+    pub fn renderer_api(isolate: &v8::Isolate) -> Rc<RendererAPI> {
         let state = Self::state(isolate);
         let state = state.borrow();
-        state.browser_api.clone()
+        state.renderer_api.clone()
     }
 
-    /// `get_browser_api` returns the `BrowserAPI` object in the Rust world linked to the runtime.
-    pub fn get_browser_api(&mut self) -> Rc<BrowserAPI> {
-        Self::browser_api(&self.v8_isolate)
+    /// `get_renderer_api` returns the `BrowserAPI` object in the Rust world linked to the runtime.
+    pub fn get_renderer_api(&mut self) -> Rc<RendererAPI> {
+        Self::renderer_api(&self.v8_isolate)
     }
 
-    /// `set_browser_api` links the given `PageViewAPIHandler` object to the runtime.
-    pub fn set_browser_api(&mut self, browser_api: Rc<BrowserAPI>) {
-        self.get_state().borrow_mut().browser_api = browser_api;
+    /// `set_renderer_api` links the given `PageViewAPIHandler` object to the runtime.
+    pub fn set_renderer_api(&mut self, renderer_api: Rc<RendererAPI>) {
+        self.get_state().borrow_mut().renderer_api = renderer_api;
     }
 }
 
@@ -208,7 +208,7 @@ mod tests {
         let (cb_sink, _cb_recv) = crossbeam_channel::unbounded();
         let mut runtime = JavaScriptRuntime::new(
             Rc::new(RefCell::new(html::parse(r#""#))),
-            Rc::new(BrowserAPI::new(Rc::new(cb_sink))),
+            Rc::new(RendererAPI::new(Rc::new(cb_sink))),
         );
 
         {
@@ -249,7 +249,7 @@ mod tests {
             Rc::new(RefCell::new(html::parse(
                 r#"<div id="hello" data="test-data"></div><p id="test">test</p>"#,
             ))),
-            Rc::new(BrowserAPI::new(Rc::new(cb_sink))),
+            Rc::new(RendererAPI::new(Rc::new(cb_sink))),
         );
 
         {
