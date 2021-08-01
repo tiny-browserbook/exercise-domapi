@@ -32,6 +32,20 @@ impl Node {
     pub fn set_inner_html(&mut self, html: &str) {
         self.children = html::parse_raw(html.into());
     }
+
+    pub fn get_element_by_id<'a>(self: &'a mut Box<Self>, id: &str) -> Option<&'a mut Box<Self>> {
+        match self.node_type {
+            NodeType::Element(ref e) => {
+                if e.id().map(|eid| eid.to_string() == id).unwrap_or(false) {
+                    return Some(self);
+                }
+            }
+            _ => (),
+        };
+        self.children
+            .iter_mut()
+            .find_map(|child| child.get_element_by_id(id))
+    }
 }
 
 impl ToString for Node {

@@ -1,4 +1,4 @@
-use exercise_domapi::{browser::Renderer, html};
+use exercise_domapi::{html, renderer::Renderer};
 use std::rc::Rc;
 
 const HTML: &str = r#"<body>

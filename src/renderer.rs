@@ -1,7 +1,7 @@
 use crate::{
     css,
     dom::{Node, NodeType},
-    javascript::{binding::RendererAPI, JavaScriptRuntime},
+    javascript::{renderapi::RendererAPI, JavaScriptRuntime},
     layout::to_layout_box,
     render::{to_element_container, ElementContainer},
     style::to_styled_node,
@@ -25,7 +25,7 @@ p, div {
 }
 "#;
 
-pub fn collect_tag_inners(node: &Box<Node>, tag_name: &str) -> Vec<String> {
+fn collect_tag_inners(node: &Box<Node>, tag_name: &str) -> Vec<String> {
     if let NodeType::Element(ref element) = node.node_type {
         if element.tag_name.as_str() == tag_name {
             return vec![node.inner_text()];

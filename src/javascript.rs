@@ -1,12 +1,12 @@
 pub mod binding;
-pub mod domapi;
+pub mod renderapi;
 
 use rusty_v8 as v8;
 use std::{cell::RefCell, rc::Rc, sync::Once};
 
-use crate::dom::Node;
+use crate::{dom::Node, javascript::binding::create_document_object};
 
-use self::binding::RendererAPI;
+use self::renderapi::RendererAPI;
 
 /// `JavaScriptRuntimeState` defines a state of JS runtime that will be stored per v8 isolate.
 pub struct JavaScriptRuntimeState {
@@ -41,7 +41,12 @@ impl JavaScriptRuntime {
             let context = v8::Context::new(handle_scope);
 
             let global = context.global(handle_scope);
-            domapi::initialize(&mut v8::ContextScope::new(handle_scope, context), global);
+            {
+                let scope = &mut v8::ContextScope::new(handle_scope, context);
+                let key = v8::String::new(scope, "document").unwrap();
+                let document = create_document_object(scope);
+                global.set(scope, key.into(), document.into());
+            }
 
             let context_scope = handle_scope.escape(context);
             v8::Global::new(handle_scope, context_scope)
@@ -251,7 +256,6 @@ mod tests {
             ))),
             Rc::new(RendererAPI::new(Rc::new(cb_sink))),
         );
-
         {
             // document.getElementById & (element).tagName
             let r = runtime.execute(
@@ -260,12 +264,6 @@ mod tests {
             );
             assert!(r.is_ok());
             assert_eq!(r.unwrap(), "div");
-        }
-        {
-            // document.getElementById & attribute access
-            let r = runtime.execute("", r#"tag.data"#);
-            assert!(r.is_ok());
-            assert_eq!(r, Ok("test-data".into()));
         }
         {
             // (element).innerHTML
