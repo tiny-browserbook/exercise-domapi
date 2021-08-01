@@ -55,14 +55,14 @@ fn to_v8_element<'s>(
         let value = v8::String::new(scope, tag_name).unwrap();
         node.define_own_property(scope, key.into(), value.into(), READ_ONLY);
     }
-    {
-        // convert attributes as properties
-        for (key, value) in attributes {
-            let key = v8::String::new(scope, key.as_str()).unwrap();
-            let value = v8::String::new(scope, value.as_str()).unwrap();
-            node.define_own_property(scope, key.into(), value.into(), READ_ONLY);
-        }
+
+    // convert attributes as properties
+    for (key, value) in attributes {
+        let key = v8::String::new(scope, key.as_str()).unwrap();
+        let value = v8::String::new(scope, value.as_str()).unwrap();
+        node.define_own_property(scope, key.into(), value.into(), READ_ONLY);
     }
+
     {
         // create `innerHTML` property
         let key = v8::String::new(scope, "innerHTML").unwrap();
@@ -95,10 +95,23 @@ fn to_v8_element<'s>(
     node
 }
 
-pub fn initialize_dom<'s>(
+fn get_element_by_id<'a>(node: NodeRefTarget<'a>, id: &str) -> Option<NodeRefTarget<'a>> {
+    match node.node_type {
+        NodeType::Element(ref e) => {
+            if e.id().map(|eid| eid.to_string() == id).unwrap_or(false) {
+                return Some(node);
+            }
+        }
+        _ => (),
+    };
+    node.children
+        .iter_mut()
+        .find_map(|child| get_element_by_id(child, id))
+}
+
+pub fn create_document_object<'s>(
     scope: &mut v8::ContextScope<'s, v8::EscapableHandleScope>,
-    global: v8::Local<v8::Object>,
-) {
+) -> v8::Local<'s, v8::Object> {
     let document = v8::ObjectTemplate::new(scope).new_instance(scope).unwrap();
 
     {
@@ -118,25 +131,21 @@ pub fn initialize_dom<'s>(
                 let document_element = JavaScriptRuntime::document_element(scope);
                 let document_element = &mut document_element.borrow_mut();
 
-                let element: v8::Local<v8::Value> = map_tree(
-                    document_element,
-                    &mut |n: NodeRefTarget| -> Option<v8::Local<v8::Value>> {
-                        let (tag_name, attributes) = match n.node_type {
-                            NodeType::Element(ref e) => {
-                                if e.id().map(|eid| eid.to_string() == id).unwrap_or(false) {
-                                    (e.tag_name.clone(), e.attributes())
-                                } else {
-                                    return None;
-                                }
+                let element: v8::Local<v8::Value> =
+                    get_element_by_id(document_element, id.as_str())
+                        .and_then(|n| {
+                            if let NodeType::Element(ref mut e) = n.node_type {
+                                let tag_name = e.tag_name.clone();
+                                let attributes = e.attributes();
+                                Some((n, tag_name, attributes))
+                            } else {
+                                None
                             }
-                            _ => return None,
-                        };
-                        Some(to_v8_element(scope, tag_name.as_str(), attributes, n).into())
-                    },
-                )
-                .into_iter()
-                .find_map(|n| n)
-                .unwrap_or(v8::undefined(scope).into());
+                        })
+                        .and_then(|(n, tag_name, attributes)| {
+                            Some(to_v8_element(scope, tag_name.as_str(), attributes, n).into())
+                        })
+                        .unwrap_or_else(|| v8::undefined(scope).into());
 
                 retval.set(element.into());
             },
@@ -145,24 +154,14 @@ pub fn initialize_dom<'s>(
         document.set(scope, key.into(), val.into());
     }
 
-    {
-        // create global.document object
-        let key = v8::String::new(scope, "document").unwrap();
-        global.set(scope, key.into(), document.into());
-    }
+    document
 }
 
-fn map_tree<T, F>(node: NodeRefTarget, f: &mut F) -> Vec<T>
-where
-    F: FnMut(NodeRefTarget) -> T,
-{
-    let mut v: Vec<T> = vec![];
-
-    for child in &mut node.children {
-        v.push(f(child));
-        v.extend(map_tree(child, f));
-    }
-
-    v.push(f(node));
-    v
+pub fn initialize_domapi<'s>(
+    scope: &mut v8::ContextScope<'s, v8::EscapableHandleScope>,
+    global: v8::Local<v8::Object>,
+) {
+    let key = v8::String::new(scope, "document").unwrap();
+    let document = create_document_object(scope);
+    global.set(scope, key.into(), document.into());
 }

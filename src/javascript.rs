@@ -41,7 +41,7 @@ impl JavaScriptRuntime {
             let context = v8::Context::new(handle_scope);
 
             let global = context.global(handle_scope);
-            domapi::initialize_dom(&mut v8::ContextScope::new(handle_scope, context), global);
+            domapi::initialize_domapi(&mut v8::ContextScope::new(handle_scope, context), global);
 
             let context_scope = handle_scope.escape(context);
             v8::Global::new(handle_scope, context_scope)
@@ -205,14 +205,12 @@ mod tests {
 
     #[test]
     fn test_execute() {
-        let (cb_sink, cb_recv) = crossbeam_channel::unbounded();
-        let cb_sink = Rc::new(cb_sink);
-        let node = html::parse(r#"<div id="hello" data="test-data"></div><p id="test">test</p>"#);
-
+        let (cb_sink, _cb_recv) = crossbeam_channel::unbounded();
         let mut runtime = JavaScriptRuntime::new(
-            Rc::new(RefCell::new(node)),
-            Rc::new(BrowserAPI::new(cb_sink)),
+            Rc::new(RefCell::new(html::parse(r#""#))),
+            Rc::new(BrowserAPI::new(Rc::new(cb_sink))),
         );
+
         {
             // a simple math
             let r = runtime.execute("", "1 + 1");
@@ -242,6 +240,18 @@ mod tests {
             assert!(r.is_ok());
             assert_eq!(r, Ok("5".into()));
         }
+    }
+
+    #[test]
+    fn test_domapi() {
+        let (cb_sink, cb_recv) = crossbeam_channel::unbounded();
+        let mut runtime = JavaScriptRuntime::new(
+            Rc::new(RefCell::new(html::parse(
+                r#"<div id="hello" data="test-data"></div><p id="test">test</p>"#,
+            ))),
+            Rc::new(BrowserAPI::new(Rc::new(cb_sink))),
+        );
+
         {
             // document.getElementById & (element).tagName
             let r = runtime.execute(
